@@ -1,0 +1,36 @@
+# Saad Mirza (2023498)
+# Moiz-ud-din (2023315)
+import face_recognition
+import os
+import pickle
+
+dataset_dir = "dataset"
+output_file = "encodings.pkl"
+
+known_encodings = []
+known_names = []
+
+# Loop over all persons (folders)
+for person_name in os.listdir(dataset_dir):
+    person_path = os.path.join(dataset_dir, person_name)
+    if not os.path.isdir(person_path):
+        continue
+    
+    # Loop over images for this person
+    for img_name in os.listdir(person_path):
+        img_path = os.path.join(person_path, img_name)
+        image = face_recognition.load_image_file(img_path)
+        face_locations = face_recognition.face_locations(image)
+        if len(face_locations) == 0:
+            print(f"No face found in {img_path}")
+            continue
+        encoding = face_recognition.face_encodings(image, face_locations)[0]
+        known_encodings.append(encoding)
+        known_names.append(person_name)
+        print(f"Encoded {img_path}")
+
+# Save encodings
+with open(output_file, "wb") as f:
+    pickle.dump({"encodings": known_encodings, "names": known_names}, f)
+
+print(f"Done! Encodings saved to {output_file}")

@@ -1,0 +1,24 @@
+# Saad Mirza (2023498)
+# Moiz-ud-din (2023315)
+import os
+import subprocess
+from time import sleep
+# ---- ASK USER ----
+person_name = input("Enter person's name: ").strip()
+num_images = int(input("How many images to capture? (e.g. 20): "))
+
+save_dir = f"dataset/{person_name}"
+os.makedirs(save_dir, exist_ok=True)
+
+print(f"\nCapturing {num_images} images for {person_name}")
+print("Look at the camera and change expressions slightly\n")
+
+for i in range(1, num_images + 1):
+    filename = f"{save_dir}/img{i:03d}.jpg"
+
+    subprocess.run(["rpicam-jpeg", "-o", filename, "-t", "500", "-n"])
+    print(f"Captured {filename}")
+
+    sleep(0.5)
+
+print("\n Dataset capture complete")

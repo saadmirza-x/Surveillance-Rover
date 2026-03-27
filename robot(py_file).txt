@@ -1,0 +1,162 @@
+# Saad Mirza (2023498)
+# Moiz-ud-din (2023315)
+from flask import Flask, render_template, request, jsonify
+import serial, time, threading, os
+import cv2
+import face_recognition
+import pickle
+import subprocess
+
+app = Flask(__name__)
+
+# ----- SERIAL -----
+motor_ser = serial.Serial('/dev/ttyACM0', 9600, timeout=0.1)
+sensor_ser = serial.Serial('/dev/ttyUSB0', 9600, timeout=0.1)
+time.sleep(2)
+
+# ----- GLOBALS -----
+mode = "MANUAL"
+manual_speed = 50
+auto_speed = 50
+autonomous_enabled = False
+joystick_override = False
+
+FRONT_THRESHOLD = 25
+SIDE_THRESHOLD = 20
+
+# ----- FACE RECOGNITION LOAD -----
+with open("encodings.pkl", "rb") as f:
+    data = pickle.load(f)
+
+known_encodings = data["encodings"]
+known_names = data["names"]
+
+last_face_time = 0
+FACE_COOLDOWN = 8  # seconds
+
+# ----- HELPERS -----
+def send_to_motor(cmd, speed):
+    motor_ser.write(f"{cmd},{speed}\n".encode())
+
+def read_sensors():
+    if sensor_ser.in_waiting:
+        try:
+            line = sensor_ser.readline().decode().strip()
+            parts = line.split(',')
+            data = {}
+            for p in parts:
+                k, v = p.split(':')
+                data[k] = int(v)
+            return data
+        except:
+            return None
+    return None
+
+# ----- AUTONOMOUS LOOP (UNCHANGED) -----
+def autonomous_loop():
+    global autonomous_enabled, joystick_override
+    while True:
+        if autonomous_enabled and not joystick_override:
+            s = read_sensors()
+            if s:
+                if s['F'] >= FRONT_THRESHOLD:
+                    send_to_motor('F', auto_speed)
+                else:
+                    if s['L'] >= SIDE_THRESHOLD and (s['R'] < SIDE_THRESHOLD or s['L'] > s['R']):
+                        send_to_motor('L', auto_speed)
+                    elif s['R'] >= SIDE_THRESHOLD:
+                        send_to_motor('R', auto_speed)
+                    else:
+                        send_to_motor('B', auto_speed)
+        time.sleep(0.1)
+
+# ----- FACE RECOGNITION LOOP -----
+def face_recognition_loop():
+    global last_face_time
+    while True:
+        subprocess.run(
+            ["rpicam-jpeg", "-o", "face_tmp.jpg", "-n", "-t", "300"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+
+        frame = cv2.imread("face_tmp.jpg")
+        if frame is None:
+            continue
+
+        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        locations = face_recognition.face_locations(rgb, model="hog")
+        encodings = face_recognition.face_encodings(rgb, locations)
+
+        for enc in encodings:
+            matches = face_recognition.compare_faces(
+                known_encodings, enc, tolerance=0.55
+            )
+
+            if True in matches:
+                now = time.time()
+                if now - last_face_time < FACE_COOLDOWN:
+                    continue
+
+                name = known_names[matches.index(True)]
+                filename = f"static/faces/{name}_{int(now)}.jpg"
+                cv2.imwrite(filename, frame)
+
+                print(f" FACE DETECTED: {name}")
+
+                # ====== SEND TRIGGER TO SENSOR ARDUINO ======
+                sensor_ser.write("TRIGGER\n".encode())
+
+                last_face_time = now
+
+        time.sleep(1)
+# ----- THREADS -----
+threading.Thread(target=autonomous_loop, daemon=True).start()
+threading.Thread(target=face_recognition_loop, daemon=True).start()
+
+# ----- ROUTES -----
+@app.route('/')
+def index():
+    return render_template('index.html', mode=mode)
+
+@app.route('/faces')
+def faces():
+    images = sorted(os.listdir("static/faces"), reverse=True)
+    return render_template("faces.html", images=images)
+
+@app.route('/command', methods=['POST'])
+def command():
+    global mode, manual_speed, auto_speed, autonomous_enabled, joystick_override
+    data = request.json
+    act = data.get('action')
+    speed = data.get('speed')
+
+    if act in ['MANUAL', 'AUTONOMOUS']:
+        mode = act
+        autonomous_enabled = (mode == 'AUTONOMOUS')
+        joystick_override = False
+        if mode == 'MANUAL':
+            send_to_motor('S', 0)
+        return jsonify({"mode": mode})
+
+    if act in ['F', 'B', 'L', 'R', 'S']:
+        sp = int(speed) if speed else manual_speed
+        if mode == 'MANUAL':
+            manual_speed = sp
+        else:
+            joystick_override = True
+        send_to_motor(act, sp)
+        return jsonify({"status": "ok"})
+
+    if act == 'RELEASE':
+        joystick_override = False
+        return jsonify({"status": "ok"})
+
+    if act == 'SET_SPEED':
+        auto_speed = int(speed)
+        return jsonify({"auto_speed": auto_speed})
+
+    return jsonify({"status": "unknown"})
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)

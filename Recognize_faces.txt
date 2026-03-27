@@ -1,0 +1,56 @@
+# Saad Mirza (2023498)
+# Moiz-ud-din (2023315)
+import cv2
+import subprocess
+import os
+import pickle
+import face_recognition
+import requests
+from time import sleep, time
+
+# -------- CONFIG --------
+SERVER_URL = "http://SERVER_IP:5000/upload"   # CHANGE THIS
+capture_file = "tmp.jpg"
+encodings_file = "encodings.pkl"
+TRIGGER_COOLDOWN = 10  # seconds
+
+last_trigger_time = 0
+
+# Load encodings
+with open(encodings_file, "rb") as f:
+    data = pickle.load(f)
+
+known_encodings = data["encodings"]
+known_names = data["names"]
+
+while True:
+    # Capture image
+    subprocess.run(["rpicam-jpeg", "-o", capture_file, "-n", "-t", "300"])
+
+    image = cv2.imread(capture_file)
+    rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+    face_locations = face_recognition.face_locations(rgb, model="hog")
+    face_encodings = face_recognition.face_encodings(rgb, face_locations)
+
+    for encoding in face_encodings:
+        matches = face_recognition.compare_faces(known_encodings, encoding)
+        if True in matches:
+            name = known_names[matches.index(True)]
+            now = time()
+
+            # Prevent spamming
+            if now - last_trigger_time < TRIGGER_COOLDOWN:
+                continue
+
+            print(f" FACE DETECTED: {name}")
+
+            # Send image to server
+            with open(capture_file, "rb") as img:
+                files = {"image": img}
+                data = {"name": name}
+                requests.post(SERVER_URL, files=files, data=data)
+
+            last_trigger_time = now
+
+    sleep(1)

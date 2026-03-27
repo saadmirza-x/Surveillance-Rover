@@ -1,0 +1,30 @@
+# Saad Mirza (2023498)
+# Moiz-ud-din (2023315)
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Detected Faces</title>
+  <style>
+    body {
+      background: black;
+      color: white;
+      text-align: center;
+      font-family: monospace;
+    }
+    img {
+      width: 300px;
+      margin: 10px;
+      border: 2px solid lime;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Recognized Faces</h1>
+
+{% for img in images %}
+  <img src="/static/faces/{{ img }}">
+{% endfor %}
+
+</body>
+</html>
