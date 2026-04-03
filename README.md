@@ -1,18 +1,54 @@
-# Surveillance-Rover
-AI-Powered Multiprocessor Surveillance Rover (GIKI)
-An Advanced Master-Slave Architecture for Autonomous Navigation & Biometric SecurityThis project represents a sophisticated implementation of Microprocessor Interfacing, utilizing a distributed computing model to handle high-level AI tasks and low-level hardware actuation simultaneously. By offloading specific tasks to dedicated microcontrollers, the system achieves real-time responsiveness and modularity.System Architecture & Interfacing (Hardware Lead)The core of this project is a Master-Slave configuration designed to manage high-speed data processing without "bottlenecking" the motor responses.The Master (Raspberry Pi 4): Acts as the central command unit. It manages the Linux-based OS, handles the heavy computational load of Computer Vision (OpenCV), hosts the Flask web server, and executes the primary autonomous logic.
-The Slaves (2x Arduino Uno):
- Slave A (Actuator Controller): Dedicated to the L298N Motor Drivers. It listens for Serial commands from the Pi to manage pulse-width modulation (PWM) for smooth movement.
- Slave B (Sensor Fusion): Continuously polls a suite of 4x Ultrasonic Sensors and a PIR Motion Sensor. It packages this data into a structured serial stream for the Pi to analyze.
-The Interface (UART Serial): Communication is established via a custom serial protocol at 9600 Baud, ensuring reliable data transfer between the $3.3V$ Pi logic and the $5V$ Arduino logic.
-Intelligence & Software (Software Lead)The rover features two distinct operation modes, managed through a custom-built web interface.1. Hybrid Navigation & Manual OverrideManual Mode: A real-time virtual joystick on the web dashboard sends directional vectors to the Pi.Autonomous Mode: The Pi implements a path-finding algorithm. When an obstacle is detected within a predefined range, the Pi compares distance data from the sideways sensors:$$Path = \max(Distance_{Left}, Distance_{Right})$$
-Hardware Priority Override: A critical safety feature where any manual input from the user instantly interrupts the autonomous loop, providing immediate hardware-level control.
-2. Edge AI Face RecognitionEncoding Pipeline: Using Python-based scripts, faces are captured and converted into 128-d feature vectors (encodings).
- Real-time Inference: The Pi’s ribbon camera scans the environment in real-time. If a detected face matches the local database "pixel-by-pixel" (index matching), it triggers a positive identification on the web UI.3. Dual-Flag Security LogicTo eliminate false positives in the security system, we implemented a logic gate that requires two separate "Intelligence Flags":Biometric Flag: Face recognized as a "Verified User."
- Environment Flag: PIR Sensor detects physical motion.Outcome: The onboard buzzer and warning LED only trigger if BOTH conditions are met ($Flag_A \cap Flag_B$).🛠️ Tech Stack & ComponentsMicroprocessors: 
- Raspberry Pi 4 Model B, 2x Arduino Uno.Sensing/Vision: 4x HC-SR04 Ultrasonic Sensors, 1x PIR Motion Sensor, Pi Ribbon Camera.Actuation: 4WD Chassis, 4x DC Motors, 2x L298N Dual H-Bridge Drivers.Software: Python (OpenCV, Flask), C++ (Arduino Wiring), HTML5/CSS3/JavaScript (UI).
-👥 The Team
-This project was a collaborative engineering effort for the Microprocessor Interfacing course at GIKI.Saad Mirza (Hardware Lead): Responsible for the system architecture design, power management, UART communication protocols, hardware-level safety overrides, and physical assembly/interfacing of all sub-systems.
-Moiz Ud Din (Software Lead): Responsible for the AI computer vision pipeline, Flask web development, face encoding scripts, and the high-level autonomous navigation logic.
+# Surveillance Rover: Autonomous Navigation & Face Recognition
 
-Special Thanks: To Abbas Khan and Fahad Bin Muslim for their expert guidance and support throughout the semester.
+An intelligent, multi-tier surveillance system integrating autonomous navigation, remote web-based control, and dual-sensor human detection. The system employs a distributed architecture where a Raspberry Pi 4 acts as the master controller for AI tasks, interfaced with two Arduino microcontrollers for real-time sensor processing and motor control.
+
+## 🚀 Features
+
+* **Edge AI Face Recognition:** Real-time facial identification using OpenCV and `face_recognition` libraries.
+* **Dual-Flag Security Logic:** Reduces false positives by requiring both PIR motion and camera-based recognition to trigger alerts.
+* **Autonomous Navigation:** Continuous distance monitoring via 4x HC-SR04 ultrasonic sensors with a 98% obstacle avoidance success rate.
+* **Web Dashboard:** A Flask-based interface for live monitoring and manual override control via HTTP.
+* **Low-Latency Communication:** Robust UART serial communication between the Pi and Arduinos with an average latency of 5ms.
+
+## 🛠️ Hardware Specifications
+
+* **Central Processor:** Raspberry Pi 4B.
+* **Microcontrollers:** 2x Arduino Uno (Motor and Sensor Controllers).
+* **Sensors:** 4x Ultrasonic Sensors (HC-SR04), 1x PIR Motion Sensor, 1x CSI Ribbon Camera.
+* **Drive System:** 4x DC Motors with H-bridge driver ICs.
+* **Power:** 12V Li-ion battery pack with regulated 5V supply.
+
+## 📁 Project Structure
+
+* `robot(py_file).txt`: The main Flask application running on the Raspberry Pi.
+* `MotorCode.ino`: Arduino firmware for PWM motor control and H-bridge interfacing.
+* `Capture_faces.txt` & `Encode_captures_faces_into_.pklfile.txt`: Scripts for building the authorized personnel dataset and generating facial encodings.
+* `Recognize_faces.txt`: Dedicated edge AI recognition script.
+* `IEEE_Report.pdf`: Comprehensive technical documentation and experimental results.
+
+## 🔧 Installation & Setup
+
+### 1. Arduino Configuration
+Flash the `MotorCode.ino` to your Motor Controller Arduino. Ensure the baud rate is set to `9600`.
+
+### 2. Raspberry Pi Setup
+Install the required Python dependencies:
+```bash
+pip install flask opencv-python face_recognition pyserial requests
+```
+
+### 3. Dataset Preparation
+1. Run `Capture_faces.py` to take photos of authorized users.
+2. Run `Encode_faces.py` to generate the `encodings.pkl` file.
+
+### 4. Launch
+Start the main controller:
+```bash
+python robot.py
+```
+Access the dashboard at `http://<your-pi-ip>:5000`.
+
+## 👥 Authors
+
+* **Moiz Ud Din Kakakhel** - *Software Lead*
+* **Saad Mirza** - *Hardware Architecture*
